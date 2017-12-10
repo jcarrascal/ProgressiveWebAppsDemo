@@ -1,0 +1,70 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Expenses";
+}
+
+<form id="movement-form" method="POST" enctype="multipart/form-data">
+    <h1 id="balance-panel">$ <span>@this.Model.Balance.ToString("N0")</span></h1>
+    <div>
+        <label for="movement-amount">Amount:</label>
+        <input id="movement-amount" name="amount" type="number" value="0"/>
+    </div>
+    <div>
+        <button type="submit" name="type" value="expense">
+            Expense
+        </button>
+        <button type="submit" name="type" value="deposit">
+            Deposit
+        </button>
+    </div>
+    <div>
+        <label for="movement-reason">Reason:</label>
+        <input id="movement-reason" name="reason" type="text"/>
+    </div>
+    <div>
+        <label for="movement-category">Category:</label>
+        <select id="movement-category-id" name="CategoryId" asp-items="Model.Categories" id="movement-category"></select>
+    </div>
+    <div>
+        <label for="movement-category">Picture:</label>
+        <input id="movement-picture" name="Picture" type="file" accept="image/*;capture=camera"/>
+    </div>
+</form>
+<table id="movements-table">
+    <thead>
+        <tr>
+            <th>$</th>
+            <th>Date</th>
+            <th>Category</th>
+            <th>Reason</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var movement in this.Model.Movements)
+        {
+            <tr>
+                <td>@movement.Amount.ToString("N0")</td>
+                <td>@movement.CreatedOn</td>
+                <td>@movement?.Category?.Name</td>
+                <td>@movement.Reason</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script>
+        $(function() {
+            $("#movement-form").expenses({
+                url: '@Url.Action("Create", "Movements")',
+                balance: $("#balance-panel span"),
+                amount: $("#movement-amount"),
+                reason: $("#movement-reason"),
+                categoryId: $("#movement-category-id"),
+                picture: $("#movement-picture"),
+                movements: $('#movements-table')
+            });
+        });
+    </script>
+}
