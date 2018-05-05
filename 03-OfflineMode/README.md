@@ -22,7 +22,7 @@ self.addEventListener('install', function (e) {
     })
   );
 });
-´´´
+```
 
 To intercept the calls we handle the "fetch" event:
 ```javascript
@@ -39,19 +39,19 @@ self.addEventListener('fetch', function (event) {
     )
   );
 });
-´´´
+```
 
 Finally, we have to register the Service Worker from the site. So, on the site.js file we add the following code:
 ```javascript
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-            navigator.serviceWorker.register('/sw.js').then(function (registration) {
-                console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            }, function (err) {
-                console.log('ServiceWorker registration failed: ', err);
-            });
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').then(function (registration) {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+        }, function (err) {
+            console.log('ServiceWorker registration failed: ', err);
         });
-    }
+    });
+}
 ´´´
 
 ## Handling POST

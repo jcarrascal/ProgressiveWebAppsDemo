@@ -1,22 +1,25 @@
 # Progressive Web Applications Demo
 Now we're going to configure Entity Framework Core, add a few models and context, create the initial migration, seed the database and use it in the page.
 
-Lest start by adding the connection string. For simplicity's sake I'll use SQL Server Local DB. In the ProgressiveWebAppsDemo.Web project open the appsettings.json file to add the ConnectionStrings element at the root object.
+Lets start by adding the connection string. For simplicity's sake I'll use SQL Server Local DB. In the ProgressiveWebAppsDemo.Web project open the appsettings.json file to add the ConnectionStrings element at the root object.
 
 ```json
+{
   "ConnectionStrings": {
     "DefaultConnection": "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=ProgressiveWebAppsDemo;Integrated Security=True"
   },
-´´´
+  ...
+}
+```
 
-Will use this connection string on the Startup class. At the end of the ConfigureServices() method we'll add the following code wich makes the DbContext available to the rest of the application:
+We will use this connection string on the Startup class. At the end of the ConfigureServices() method we'll add the following code wich makes the DbContext available to the rest of the application:
 
 ```csharp
-            services.AddDbContext<ExpensesContext>(options =>
-            {
-                options.UseSqlServer(this.Configuration.GetConnectionString("DefaultConnection"));
-            });
-´´´
+services.AddDbContext<ExpensesContext>(options =>
+{
+    options.UseSqlServer(this.Configuration.GetConnectionString("DefaultConnection"));
+});
+```
 
 Now, we have to create the DbContext which is the ExpensesContext class we are referening int the ConfigureServices() method:
 
@@ -30,7 +33,7 @@ namespace ProgressiveWebAppsDemo.Web.Data
     {
     }
 }
-´´´
+```
 
 This class should have at least two things:
 1. A constructor that receives a DbContextOptions<ExpensesContext> object that is passed to base(). This constructor receives the connection string we just created.
@@ -42,15 +45,15 @@ These classes use a few property attributes to control how they are handled by E
 To create the database we use EF Core Migrations. First have to execute the following commands on the powershell console:
 ```
 dotnet ef migrations add InitialCreate
-´´´
+```
 
 This will create a Migrations folder with the initial state of the database. Now, to create the database we execute the following command:
 ```
 dotnet ef database update
-´´´
+```
 
 This database is empty, but the application requires that at least one category is available. To seed the database we add a method to the context:
-```
+```csharp
 public void EnsureSeedData()
 {
     this.Database.ExecuteSqlCommand(@"
@@ -69,17 +72,18 @@ public void EnsureSeedData()
         SET IDENTITY_INSERT Categories OFF
     ");
 }
-´´´
+```
 
 ... and execute it from the Startup class at the end of the Configure() method:
+```csharp
+using (var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>().CreateScope())
+{
+    var context = serviceScope.ServiceProvider.GetService<ExpensesContext>();
+    context.Database.Migrate();
+    context.EnsureSeedData();
+}
 ```
-            using (var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>().CreateScope())
-            {
-                var context = serviceScope.ServiceProvider.GetService<ExpensesContext>();
-                context.Database.Migrate();
-                context.EnsureSeedData();
-            }
-´´´
+
 Each time we start the application, the migrations will run and the data will be seeded.
 
 ## Testing with EF Core
@@ -87,42 +91,42 @@ Now, let's start adding functionality by adding some tests. Remove the UnitTest1
 
 The Index page should show all the categories in alphabetical order, so here's a test for that:
 ```csharp
-        [Fact]
-        public void OnGet_WhenCalled_ThenLoadsCategoriesInAlphaOrder()
-        {
-            var options = new DbContextOptionsBuilder<ExpensesContext>()
-                .UseInMemoryDatabase(databaseName: "OnGet_WhenCalled_ThenLoadsCategoriesInAlphaOrder")
-                .Options;
-            using (var expensesContext = new ExpensesContext(options))
-            {
-                expensesContext.Categories.Add(new Category("Foo"));
-                expensesContext.Categories.Add(new Category("Bar"));
-                expensesContext.Categories.Add(new Category("Baz"));
-                expensesContext.SaveChanges();
-                var model = new IndexModel(expensesContext);
+[Fact]
+public void OnGet_WhenCalled_ThenLoadsCategoriesInAlphaOrder()
+{
+    var options = new DbContextOptionsBuilder<ExpensesContext>()
+        .UseInMemoryDatabase(databaseName: "OnGet_WhenCalled_ThenLoadsCategoriesInAlphaOrder")
+        .Options;
+    using (var expensesContext = new ExpensesContext(options))
+    {
+        expensesContext.Categories.Add(new Category("Foo"));
+        expensesContext.Categories.Add(new Category("Bar"));
+        expensesContext.Categories.Add(new Category("Baz"));
+        expensesContext.SaveChanges();
+        var model = new IndexModel(expensesContext);
 
-                model.OnGet();
+        model.OnGet();
 
-                Assert.NotNull(model.Categories);
-                Assert.NotEmpty(model.Categories);
-                Assert.Equal(3, model.Categories.Length);
-                Assert.Equal("Bar", model.Categories[0].Text);
-                Assert.Equal("Baz", model.Categories[1].Text);
-                Assert.Equal("Foo", model.Categories[2].Text);
-            }
-        }
-´´´
+        Assert.NotNull(model.Categories);
+        Assert.NotEmpty(model.Categories);
+        Assert.Equal(3, model.Categories.Length);
+        Assert.Equal("Bar", model.Categories[0].Text);
+        Assert.Equal("Baz", model.Categories[1].Text);
+        Assert.Equal("Foo", model.Categories[2].Text);
+    }
+}
+```
 
 Here, we are using the In-Memory database as a way to test that the correct result is being delivered. To implement this test, and the other required functionality, move onto the Index.cshtml.cs file and add the following method:
 
 ```csharp
-        public void OnGet()
-        {
-            this.Categories = this.mExpensesContext.Categories.OrderBy(c => c.Name).Select(c => new SelectListItem { Text = c.Name, Value = c.Id.ToString() }).ToArray();
-            this.Movements = this.mExpensesContext.Movements.Include(m => m.Category).OrderByDescending(m => m.CreatedOn).Take(PageSize).ToArray();
-            this.Balance = this.mExpensesContext.Movements.Sum(m => m.Amount);
-        }
-´´´
+public void OnGet()
+{
+    this.Categories = this.mExpensesContext.Categories.OrderBy(c => c.Name).Select(c => new SelectListItem { Text = c.Name, Value = c.Id.ToString() }).ToArray();
+    this.Movements = this.mExpensesContext.Movements.Include(m => m.Category).OrderByDescending(m => m.CreatedOn).Take(PageSize).ToArray();
+    this.Balance = this.mExpensesContext.Movements.Sum(m => m.Amount);
+}
+```
 
 Finally add the necessary HTML code to Index.cshtml to display the results.
 
@@ -175,48 +179,48 @@ Finally add the necessary HTML code to Index.cshtml to display the results.
         }
     </tbody>
 </table>
-´´´
+```
 Now, we have to make an Ajax request to store the Expense or the Deposit as required by the user. On site.js we create a jQuery plugin that handles the expenses form submit event. Here's the relevant code:
 
 ```javascript
-        self._formSubmit = function (e) {
-            e.preventDefault();
-            let formData = new FormData(this);
-            let button = e.originalEvent.explicitOriginalTarget;
-            formData.append(button.name, button.value);
-            $.ajax({
-                url: cfg.url,
-                data: formData,
-                type: "POST",
-                processData: false,
-                contentType: false,
-                success: self._processResponse(data)
-            });
+self._formSubmit = function (e) {
+    e.preventDefault();
+    let formData = new FormData(this);
+    let button = e.originalEvent.explicitOriginalTarget;
+    formData.append(button.name, button.value);
+    $.ajax({
+        url: cfg.url,
+        data: formData,
+        type: "POST",
+        processData: false,
+        contentType: false,
+        success: self._processResponse(data)
+    });
 
-        };
-        this.on("submit", self._formSubmit);
-´´´
+};
+this.on("submit", self._formSubmit);
+```
 
 # Persisting the movement
 To persist the movement we'll create a MovementsController. Create a Controllers folder and a MovementsController.cs with the following Create() method:
 ```csharp
-        [HttpPost]
-        public IActionResult Create(MovementForm form)
-        {
-            var category = this.mExpensesContext.Categories.Find(form.CategoryId);
-            var amount = form.Amount * (form.Type == "expense" ? -1 : 1);
-            byte[] picture;
-            using (var ms = new MemoryStream())
-            {
-                form.Picture?.CopyTo(ms);
-                picture = ms.ToArray();
-            }
+[HttpPost]
+public IActionResult Create(MovementForm form)
+{
+    var category = this.mExpensesContext.Categories.Find(form.CategoryId);
+    var amount = form.Amount * (form.Type == "expense" ? -1 : 1);
+    byte[] picture;
+    using (var ms = new MemoryStream())
+    {
+        form.Picture?.CopyTo(ms);
+        picture = ms.ToArray();
+    }
 
-            var movement = new Movement(amount, form.Reason, category, picture, form.CreatedOn);
-            this.mExpensesContext.Movements.Add(movement);
-            this.mExpensesContext.SaveChanges();
+    var movement = new Movement(amount, form.Reason, category, picture, form.CreatedOn);
+    this.mExpensesContext.Movements.Add(movement);
+    this.mExpensesContext.SaveChanges();
 
-            var balance = this.mExpensesContext.Movements.Sum(m => m.Amount);
-            return this.Json(new { movement = movement, balance = balance });
-        }
-´´´
+    var balance = this.mExpensesContext.Movements.Sum(m => m.Amount);
+    return this.Json(new { movement = movement, balance = balance });
+}
+```
